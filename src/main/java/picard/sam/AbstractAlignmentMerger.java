@@ -23,37 +23,11 @@
  */
 package picard.sam;
 
-import htsjdk.samtools.BAMRecordCodec;
-import htsjdk.samtools.Cigar;
-import htsjdk.samtools.CigarElement;
-import htsjdk.samtools.CigarOperator;
-import htsjdk.samtools.ReservedTagConstants;
-import htsjdk.samtools.SAMFileHeader;
-import htsjdk.samtools.SAMFileHeader.SortOrder;
-import htsjdk.samtools.SAMFileWriter;
-import htsjdk.samtools.SAMFileWriterFactory;
-import htsjdk.samtools.SAMProgramRecord;
-import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SAMRecordCoordinateComparator;
-import htsjdk.samtools.SAMRecordQueryNameComparator;
-import htsjdk.samtools.SAMSequenceDictionary;
-import htsjdk.samtools.SAMSequenceRecord;
-import htsjdk.samtools.SAMTag;
-import htsjdk.samtools.SAMUtils;
-import htsjdk.samtools.SamPairUtil;
-import htsjdk.samtools.SamReader;
-import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.*;
 import htsjdk.samtools.filter.FilteringSamIterator;
 import htsjdk.samtools.filter.SamRecordFilter;
 import htsjdk.samtools.reference.ReferenceSequenceFileWalker;
-import htsjdk.samtools.util.CigarUtil;
-import htsjdk.samtools.util.CloseableIterator;
-import htsjdk.samtools.util.CloserUtil;
-import htsjdk.samtools.util.IOUtil;
-import htsjdk.samtools.util.Log;
-import htsjdk.samtools.util.ProgressLogger;
-import htsjdk.samtools.util.SequenceUtil;
-import htsjdk.samtools.util.SortingCollection;
+import htsjdk.samtools.util.*;
 import picard.PicardException;
 
 import java.io.File;
@@ -92,20 +66,19 @@ public abstract class AbstractAlignmentMerger {
 
     private final File unmappedBamFile;
     private final File targetBamFile;
-    private final SAMSequenceDictionary sequenceDictionary;
     private ReferenceSequenceFileWalker refSeq = null;
     private final boolean clipAdapters;
     private final boolean bisulfiteSequence;
     private SAMProgramRecord programRecord;
     private final boolean alignedReadsOnly;
     private final SAMFileHeader header;
-    private final List<String> attributesToRetain = new ArrayList<String>();
-    private final List<String> attributesToRemove = new ArrayList<String>();
+    private final List<String> attributesToRetain = new ArrayList<>();
+    private final List<String> attributesToRemove = new ArrayList<>();
     protected final File referenceFasta;
     private final Integer read1BasesTrimmed;
     private final Integer read2BasesTrimmed;
     private final List<SamPairUtil.PairOrientation> expectedOrientations;
-    private final SortOrder sortOrder;
+    private final SAMFileHeader.SortOrder sortOrder;
     private MultiHitAlignedReadIterator alignedIterator = null;
     private boolean clipOverlappingReads = true;
     private int maxRecordsInRam = MAX_RECORDS_IN_RAM;
@@ -156,6 +129,7 @@ public abstract class AbstractAlignmentMerger {
         }
     }
 
+    protected abstract SAMSequenceDictionary getDictionaryForMergedBam();
 
     protected abstract CloseableIterator<SAMRecord> getQuerynameSortedAlignedRecords();
 
@@ -215,23 +189,18 @@ public abstract class AbstractAlignmentMerger {
         this.referenceFasta = referenceFasta;
 
         this.refSeq = new ReferenceSequenceFileWalker(referenceFasta);
-        this.sequenceDictionary = refSeq.getSequenceDictionary();
-        if (this.sequenceDictionary == null) {
-            throw new PicardException("No sequence dictionary found for " + referenceFasta.getAbsolutePath() +
-                    ".  Use CreateSequenceDictionary.jar to create a sequence dictionary.");
-        }
 
         this.clipAdapters = clipAdapters;
         this.bisulfiteSequence = bisulfiteSequence;
         this.alignedReadsOnly = alignedReadsOnly;
 
         this.header = new SAMFileHeader();
-        this.sortOrder = sortOrder != null ? sortOrder : SortOrder.coordinate;
-        header.setSortOrder(SortOrder.coordinate);
+        this.sortOrder = sortOrder != null ? sortOrder : SAMFileHeader.SortOrder.coordinate;
+        header.setSortOrder(SAMFileHeader.SortOrder.coordinate);
         if (programRecord != null) {
             setProgramRecord(programRecord);
         }
-        header.setSequenceDictionary(this.sequenceDictionary);
+
         if (attributesToRetain != null) {
             this.attributesToRetain.addAll(attributesToRetain);
         }
@@ -239,12 +208,12 @@ public abstract class AbstractAlignmentMerger {
             this.attributesToRemove.addAll(attributesToRemove);
             // attributesToRemove overrides attributesToRetain
             if (!this.attributesToRetain.isEmpty()) {
-                for (String attribute : this.attributesToRemove) {
-                    if (this.attributesToRetain.contains(attribute)) {
-                        log.info("Overriding retaining the " + attribute + " tag since remove overrides retain.");
-                        this.attributesToRetain.remove(attribute);
-                    }
-                }
+                this.attributesToRemove.stream()
+                        .filter(this.attributesToRetain::contains)
+                        .forEach(attribute -> {
+                    log.info("Overriding retaining the " + attribute + " tag since remove overrides retain.");
+                    this.attributesToRetain.remove(attribute);
+                });
             }
         }
         this.read1BasesTrimmed = read1BasesTrimmed;
@@ -283,6 +252,7 @@ public abstract class AbstractAlignmentMerger {
         final SamReader unmappedSam = SamReaderFactory.makeDefault().referenceSequence(referenceFasta).open(this.unmappedBamFile);
 
         final CloseableIterator<SAMRecord> unmappedIterator = unmappedSam.iterator();
+        this.header.setSequenceDictionary(getDictionaryForMergedBam());
         this.header.setReadGroups(unmappedSam.getFileHeader().getReadGroups());
 
         int aligned = 0;
@@ -307,7 +277,7 @@ public abstract class AbstractAlignmentMerger {
         // in order to have access to the records in coordinate order prior to outputting them. Otherwise
         // write directly to the output BAM file in queryname order.
         final Sink sink;
-        if (this.sortOrder == SortOrder.coordinate) {
+        if (this.sortOrder == SAMFileHeader.SortOrder.coordinate) {
             final SortingCollection<SAMRecord> sorted1 = SortingCollection.newInstance(
                     SAMRecord.class, new BAMRecordCodec(header), new SAMRecordCoordinateComparator(),
                     MAX_RECORDS_IN_RAM);
@@ -467,7 +437,7 @@ public abstract class AbstractAlignmentMerger {
         sink.close();
 
         // Write the records to the output file in specified sorted order,
-        if (this.sortOrder == SortOrder.coordinate) {
+        if (this.sortOrder == SAMFileHeader.SortOrder.coordinate) {
             header.setSortOrder(this.sortOrder);
             final SAMFileWriter writer = new SAMFileWriterFactory().makeSAMOrBAMWriter(header, true, this.targetBamFile);
             writer.setProgressLogger(new ProgressLogger(log, (int) 1e7, "Wrote", "records from a sorting collection"));
@@ -741,8 +711,6 @@ public abstract class AbstractAlignmentMerger {
             removeNmMdAndUqTags(rec); // these tags are now invalid!
         }
     }
-
-    protected SAMSequenceDictionary getSequenceDictionary() { return this.sequenceDictionary; }
 
     protected SAMProgramRecord getProgramRecord() { return this.programRecord; }
 
