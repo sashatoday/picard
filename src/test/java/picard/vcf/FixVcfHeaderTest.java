@@ -27,11 +27,14 @@ package picard.vcf;
 
 import htsjdk.samtools.util.IOUtil;
 import org.testng.Assert;
+import org.testng.annotations.BeforeSuite;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import picard.PicardException;
 
 import java.io.File;
+import java.io.IOException;
 
 /**
  * Tests for FixVcfHeader.
@@ -39,12 +42,23 @@ import java.io.File;
  * @author Nils Homer
  */
 public class FixVcfHeaderTest {
-    private static final File OUTPUT_DATA_PATH             = IOUtil.createTempDir("FixVcfHeaderTest", null);
-    private static final File TEST_DATA_PATH               = new File("testdata/picard/vcf/FixVcfHeaderTest/");
-    private static final File INPUT_VCF                    = new File(TEST_DATA_PATH, "input.vcf");
-    private static final File OUTPUT_VCF                   = new File(TEST_DATA_PATH, "output.vcf");
-    private static final File HEADER_VCF                   = new File(TEST_DATA_PATH, "header.vcf");
-    private static final File HEADER_VCF_WITH_EXTRA_SAMPLE = new File(TEST_DATA_PATH, "header_with_extra_sample.vcf");
+    private File OUTPUT_DATA_PATH;
+    private File TEST_DATA_PATH;
+    private File INPUT_VCF;
+    private File OUTPUT_VCF;
+    private File HEADER_VCF;
+    private File HEADER_VCF_WITH_EXTRA_SAMPLE;
+
+    @BeforeTest
+    void setup() throws IOException {
+        OUTPUT_DATA_PATH             = IOUtil.createTempDir("FixVcfHeaderTest", null);
+        OUTPUT_DATA_PATH.deleteOnExit();
+        TEST_DATA_PATH               = new File("testdata/picard/vcf/FixVcfHeaderTest/");
+        INPUT_VCF                    = new File(TEST_DATA_PATH, "input.vcf");
+        OUTPUT_VCF                   = new File(TEST_DATA_PATH, "output.vcf");
+        HEADER_VCF                   = new File(TEST_DATA_PATH, "header.vcf");
+        HEADER_VCF_WITH_EXTRA_SAMPLE = new File(TEST_DATA_PATH, "header_with_extra_sample.vcf");
+    }
 
     private void runFixVcfHeader(final int checkFirstNRecords,
                                  final File replacementHeader,
@@ -52,6 +66,8 @@ public class FixVcfHeaderTest {
         final FixVcfHeader program = new FixVcfHeader();
         final File outputVcf = new File(OUTPUT_DATA_PATH, "output.vcf");
         outputVcf.deleteOnExit();
+        final File outputVcfIndex = new File(OUTPUT_DATA_PATH, "output.vcf.idx");
+        outputVcfIndex.deleteOnExit();
 
         program.INPUT      = INPUT_VCF;
         program.OUTPUT     = outputVcf;

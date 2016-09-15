@@ -31,9 +31,9 @@ import htsjdk.variant.vcf.VCFFileReader;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 import picard.PicardException;
-import picard.vcf.filter.FilterVcf;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.Set;
 import java.util.SortedSet;
@@ -59,8 +59,7 @@ public class TestFilterVcf {
 
 	@Test
 	public void testJavaScript() throws Exception {
-		final File out = File.createTempFile("filterVcfTestJS.", ".vcf");
-		out.deleteOnExit();
+        final File out = createTempVcfFileAndDeleteItAndItsIndexFileOnExit("filterVcfTestJS.", ".vcf");
 		final FilterVcf filterer = new FilterVcf();
 		filterer.INPUT = INPUT;
 		filterer.OUTPUT = out;
@@ -159,9 +158,8 @@ public class TestFilterVcf {
     }
 
     /** Utility method that takes a a VCF and a set of parameters and filters the VCF. */
-    File testFiltering(final File vcf, final String outputExtension, final double minAb, final int minDp, final int minGq, final double maxFs) throws Exception {
-        final File out = File.createTempFile("filterVcfTest.", outputExtension);
-        out.deleteOnExit();
+    private File testFiltering(final File vcf, final String outputExtension, final double minAb, final int minDp, final int minGq, final double maxFs) throws Exception {
+        final File out = createTempVcfFileAndDeleteItAndItsIndexFileOnExit("filterVcfTest.", outputExtension);
 
         final FilterVcf filterer = new FilterVcf();
         filterer.CREATE_INDEX = true;
@@ -177,6 +175,23 @@ public class TestFilterVcf {
             throw new PicardException("Return value non-zero: " + retval);
         }
 
+        return out;
+    }
+
+    private File createTempVcfFileAndDeleteItAndItsIndexFileOnExit(final String prefix, final String suffix) throws IOException {
+        final File out = File.createTempFile(prefix, suffix);
+        out.deleteOnExit();
+        String indexFileExtension = null;
+        if (suffix.endsWith("vcf.gz")) {
+            indexFileExtension = ".tbi";
+        }
+        else if (suffix.endsWith("vcf")) {
+            indexFileExtension = ".idx";
+        }
+        if (indexFileExtension != null) {
+            final File indexOut = new File(out.getAbsolutePath() + indexFileExtension);
+            indexOut.deleteOnExit();
+        }
         return out;
     }
 
