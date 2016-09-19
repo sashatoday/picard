@@ -42,8 +42,6 @@ import java.io.IOException;
  * @author Nils Homer
  */
 public class FixVcfHeaderTest {
-    private File OUTPUT_DATA_PATH;
-    private File TEST_DATA_PATH;
     private File INPUT_VCF;
     private File OUTPUT_VCF;
     private File HEADER_VCF;
@@ -51,23 +49,20 @@ public class FixVcfHeaderTest {
 
     @BeforeTest
     void setup() throws IOException {
-        OUTPUT_DATA_PATH             = IOUtil.createTempDir("FixVcfHeaderTest", null);
+        File OUTPUT_DATA_PATH = IOUtil.createTempDir("FixVcfHeaderTest", null);
         OUTPUT_DATA_PATH.deleteOnExit();
-        TEST_DATA_PATH               = new File("testdata/picard/vcf/FixVcfHeaderTest/");
-        INPUT_VCF                    = new File(TEST_DATA_PATH, "input.vcf");
-        OUTPUT_VCF                   = new File(TEST_DATA_PATH, "output.vcf");
-        HEADER_VCF                   = new File(TEST_DATA_PATH, "header.vcf");
-        HEADER_VCF_WITH_EXTRA_SAMPLE = new File(TEST_DATA_PATH, "header_with_extra_sample.vcf");
+        final File testDataPath      = new File("testdata/picard/vcf/FixVcfHeaderTest/");
+        INPUT_VCF                    = new File(testDataPath, "input.vcf");
+        OUTPUT_VCF                   = new File(testDataPath, "output.vcf");
+        HEADER_VCF                   = new File(testDataPath, "header.vcf");
+        HEADER_VCF_WITH_EXTRA_SAMPLE = new File(testDataPath, "header_with_extra_sample.vcf");
     }
 
     private void runFixVcfHeader(final int checkFirstNRecords,
                                  final File replacementHeader,
-                                 final boolean enforceSampleSamples) {
+                                 final boolean enforceSampleSamples) throws IOException {
         final FixVcfHeader program = new FixVcfHeader();
-        final File outputVcf = new File(OUTPUT_DATA_PATH, "output.vcf");
-        outputVcf.deleteOnExit();
-        final File outputVcfIndex = new File(OUTPUT_DATA_PATH, "output.vcf.idx");
-        outputVcfIndex.deleteOnExit();
+        final File outputVcf = VcfTestUtils.createTemporaryIndexedVcfFile("output.", ".vcf");
 
         program.INPUT      = INPUT_VCF;
         program.OUTPUT     = outputVcf;
@@ -87,7 +82,7 @@ public class FixVcfHeaderTest {
     @Test(dataProvider = "testFixVcfHeaderDataProvider")
     public void testFixVcfHeader(final int checkFirstNRecords,
                                  final File replacementHeader,
-                                 final boolean enforceSampleSamples) {
+                                 final boolean enforceSampleSamples) throws IOException {
         runFixVcfHeader(checkFirstNRecords, replacementHeader, enforceSampleSamples);
     }
 
@@ -104,7 +99,7 @@ public class FixVcfHeaderTest {
     }
 
     @Test(expectedExceptions=PicardException.class)
-    public void testReplaceHeaderWithDifferentSamplesError() {
+    public void testReplaceHeaderWithDifferentSamplesError() throws IOException {
         runFixVcfHeader(-1, HEADER_VCF_WITH_EXTRA_SAMPLE, true);
     }
 }
