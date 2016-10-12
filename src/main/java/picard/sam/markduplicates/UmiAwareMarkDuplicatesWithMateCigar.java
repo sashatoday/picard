@@ -95,7 +95,6 @@ public class UmiAwareMarkDuplicatesWithMateCigar extends SimpleMarkDuplicatesWit
         if(UMI_METRICS_FILE != null) {
             MetricsFile<UmiMetrics, Double> metricsFile = getMetricsFile();
 
-            metricsFile.addHistogram(metrics.getDuplicateSetsBrokenByUmi());
             metricsFile.addMetric(metrics);
 
             metricsFile.write(UMI_METRICS_FILE);

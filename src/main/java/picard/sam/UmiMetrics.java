@@ -32,8 +32,6 @@ import htsjdk.samtools.util.Histogram;
  * within a stream of SAMRecords using the UmiAwareDuplicateSetIterator.
  */
 public class UmiMetrics extends MetricBase {
-    private int[] brokenByUmiDistribution;
-
     // Number of bases in each UMI
     public int UMI_LENGTH;
 
@@ -59,38 +57,16 @@ public class UmiMetrics extends MetricBase {
     // information (given as effective bases) provided by each observed UMI
     public double EFFECTIVE_LENGTH_OF_OBSERVED_UMIS = 0;
 
-
     public double EFFECTIVE_LENGTH_OF_INFERRED_UMIS = 0;
 
     // Estimation of Phred scaled quality scores for UMIs
     public double ESTIMATED_BASE_QUALITY_OF_UMIS;
 
-    // Distribution of duplicate set sizes broken up by UMI
-    private Histogram<Double> DUPLICATE_SETS_BROKEN_BY_UMI;
-
     // Phred scaled quality of UMI avoidance
     public double UMI_AVOIDANCE;
-
-    // Calculation of effecitve UMI length using the
-    private Histogram<Double> EFFECTIVE_UMI_LENGTH_DISTRIBUTION;
 
     public void computeMetrics() {
         ESTIMATED_BASE_QUALITY_OF_UMIS = -10.0*Math.log10((double) OBSERVED_BASE_ERRORS / (double) TOTAL_UMI_BASES_OBSERVED);
     }
 
-    public void setDuplicateSetsBrokenByUmi(Histogram<Double> h) {
-        DUPLICATE_SETS_BROKEN_BY_UMI = h;
-    }
-
-    public void setEffectiveUmiLengthDistribution(Histogram<Double> h) {
-        EFFECTIVE_UMI_LENGTH_DISTRIBUTION = h;
-    }
-
-    public Histogram<Double> getDuplicateSetsBrokenByUmi() {
-        return DUPLICATE_SETS_BROKEN_BY_UMI;
-    }
-
-    public Histogram<Double> getEffectiveUmiLengthDistribution() {
-        return EFFECTIVE_UMI_LENGTH_DISTRIBUTION;
-    }
 }

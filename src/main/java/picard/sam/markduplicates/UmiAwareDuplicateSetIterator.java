@@ -63,19 +63,17 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
     private long duplicateSetsWithUmi = 0;
     private long duplicateSetsWithoutUmi = 0;
 
-    private List<Histogram<String>> observedUmisOfVariedLength = new ArrayList<>();
     private Histogram<String> observedUmis = new Histogram<>();
     private Histogram<String> inferredUmis = new Histogram<>();
     private Histogram<String> umiObservationByDuplicateSet = new Histogram<>();
-    private Histogram<Double> brokenByUmiDistribution = new Histogram<>("DuplicateSetsFromUmi", "numberOfDuplicateSets");
 
     /**
      * Creates a UMI aware duplicate set iterator
      *
-     * @param wrappedIterator UMI aware duplicate set iterator is a wrapper
+     * @param wrappedIterator       UMI aware duplicate set iterator is a wrapper
      * @param maxEditDistanceToJoin The edit distance between UMIs that will be used to union UMIs into groups
-     * @param umiTag The tag used in the bam file that designates the UMI
-     * @param assignedUmiTag The tag in the bam file that designates the assigned UMI
+     * @param umiTag                The tag used in the bam file that designates the UMI
+     * @param assignedUmiTag        The tag in the bam file that designates the assigned UMI
      */
 
     // Metrics is passed in by reference so that iterator can update it.
@@ -107,14 +105,7 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
         metrics.DUPLICATE_SETS_WITH_UMI = duplicateSetsWithUmi;
         metrics.DUPLICATE_SETS_WITHOUT_UMI = duplicateSetsWithoutUmi;
 
-        Histogram<Double> effectiveUmiLengthDistribution = new Histogram<>();
-
-        for(int k = 0; k < metrics.UMI_LENGTH; k++) {
-            effectiveUmiLengthDistribution.increment(effectiveNumberOfBases(observedUmisOfVariedLength.get(k)));
-        }
         metrics.computeMetrics();
-        metrics.setDuplicateSetsBrokenByUmi(brokenByUmiDistribution);
-        metrics.setEffectiveUmiLengthDistribution(effectiveUmiLengthDistribution);
 
     }
 
@@ -166,13 +157,9 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
             for (SAMRecord rec : records) {
                 String currentUmi = rec.getStringAttribute(umiTag);
 
-                if(currentUmi != null) {
+                if (currentUmi != null) {
                     if (!haveWeSeenFirstRead) {
                         metrics.UMI_LENGTH = currentUmi.length();
-
-                        for (int k = 1; k <= metrics.UMI_LENGTH; k++) {
-                            observedUmisOfVariedLength.add(new Histogram<>());
-                        }
                         haveWeSeenFirstRead = true;
                     }
 
@@ -182,9 +169,6 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
                     observedUmis.increment(currentUmi);
                     inferredUmis.increment(inferredUmi);
 
-                    for (int k = 0; k < currentUmi.length(); k++) {
-                        observedUmisOfVariedLength.get(k).increment(currentUmi.substring(currentUmi.length() - k - 1));
-                    }
                 }
             }
 
@@ -194,14 +178,9 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
                 umiObservationByDuplicateSet.increment(inferredUmi);
             }
 
-//            if(ds.size() > 100) {
-//                measureBaseConcordance(ds);
-//            }
             duplicateSetsWithUmi++;
         }
         duplicateSetsWithoutUmi++;
-
-        brokenByUmiDistribution.increment((double) duplicateSets.size());
 
         nextSetsIterator = duplicateSets.iterator();
     }
@@ -236,40 +215,4 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
         }
         return measuredDistance;
     }
-
-    private double measureBaseConcordance(DuplicateSet ds) {
-        List<SAMRecord> records = ds.getRecords();
-
-        byte[][] baseArray = new byte[records.size()][];
-        int i = 0;
-        for(SAMRecord rec : records) {
-            baseArray[i] = rec.getReadBases();
-//            System.out.println(new String(baseArray[i]));
-            i++;
-        }
-
-        for(int j = 0;j < baseArray[0].length;j++) {
-            int a = 0;
-            int t = 0;
-            int c = 0;
-            int g = 0;
-            for(int k = 0;k < records.size();k++) {
-                if(baseArray[k][j] == 'A') {
-                    a++;
-                }
-                if(baseArray[k][j] == 'T') {
-                    t++;
-                }
-                if(baseArray[k][j] == 'C') {
-                    c++;
-                }
-                if(baseArray[k][j] == 'G') {
-                    g++;
-                }
-            }
-            System.out.println("A=" + a + "   T=" + t + "   C=" + c + "   G=" + g);
-        }
-        return 0.0;
-    }
 }
-
