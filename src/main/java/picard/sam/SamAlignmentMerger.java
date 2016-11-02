@@ -149,7 +149,6 @@ public class SamAlignmentMerger extends AbstractAlignmentMerger {
             alignedSamFile.stream()
                     .map(SAMSequenceDictionaryExtractor::extractDictionary)
                     .forEach(finalDict::assertSameDictionary);
-
         } else {
             final SeparateEndAlignmentIterator mergingIterator = new SeparateEndAlignmentIterator(this.read1AlignedSamFile, this.read2AlignedSamFile, referenceFasta);
             finalDict = mergingIterator.getHeader().getSequenceDictionary();
@@ -160,7 +159,7 @@ public class SamAlignmentMerger extends AbstractAlignmentMerger {
             throw new PicardException("No sequence dictionary found for " + referenceFasta.getAbsolutePath() +
                     ".  Use CreateSequenceDictionary.jar to create a sequence dictionary.");
         }
-        return SAMSequenceDictionary.mergeDictionaries(finalDict, SAMSequenceDictionaryExtractor.extractDictionary(referenceFasta), matchingDictionaryTags);
+        return SAMSequenceDictionary.mergeDictionaries(finalDict, referenceDict, matchingDictionaryTags);
     }
 
 
@@ -212,7 +211,6 @@ public class SamAlignmentMerger extends AbstractAlignmentMerger {
             return mergingIterator;
         }
 
-
         final SortingCollection<SAMRecord> alignmentSorter = SortingCollection.newInstance(SAMRecord.class,
                 new BAMRecordCodec(header), new SAMRecordQueryNameComparator(), MAX_RECORDS_IN_RAM);
 
@@ -235,6 +233,7 @@ public class SamAlignmentMerger extends AbstractAlignmentMerger {
             }
         };
     }
+
 
     private final class SuffixTrimingSamRecordIterator implements CloseableIterator<SAMRecord> {
         private final CloseableIterator<SAMRecord> underlyingIterator;
@@ -376,6 +375,4 @@ public class SamAlignmentMerger extends AbstractAlignmentMerger {
 
     // Accessor for testing
     public boolean getForceSort() {return this.forceSort; }
-
-
 }

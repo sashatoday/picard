@@ -65,8 +65,8 @@ public class MergeBamAlignmentTest extends CommandLineProgramTest {
     private static final File secondReadAlignedBam_secondHalf = new File(TEST_DATA_DIR, "secondhalf.read2.trimmed.aligned.sam");
     private static final File supplementalReadAlignedBam = new File(TEST_DATA_DIR, "aligned.supplement.sam");
     private static final File alignedQuerynameSortedBam = new File("testdata/picard/sam/aligned_queryname_sorted.sam");
-    private static final String bigSequenceName = "chr7"; // The longest sequence in merger.fasta
     private static final File fasta = new File("testdata/picard/sam/merger.fasta");
+    private static final String bigSequenceName = "chr7"; // The longest sequence in merger.fasta
     private static final File sequenceDict = new File("testdata/picard/sam/merger.dict");
     private static final File sequenceDict2 = new File("testdata/picard/sam/merger.2.dict");
     private static final File badorderUnmappedBam = new File(TEST_DATA_DIR, "unmapped.badorder.sam");
@@ -1104,7 +1104,6 @@ public class MergeBamAlignmentTest extends CommandLineProgramTest {
 
             final String sequence = "chr1";
             // Populate the header with SAMSequenceRecords
-//            header.getSequenceDictionary().addSequence(new SAMSequenceRecord(sequence, 1000000));
             header.setSequenceDictionary(SamReaderFactory.makeDefault().getFileHeader(sequenceDict2).getSequenceDictionary());
 
             final SAMFileWriter alignedWriter = factory.makeSAMWriter(header, false, alignedSam);
@@ -1230,7 +1229,6 @@ public class MergeBamAlignmentTest extends CommandLineProgramTest {
 
         final String sequence = "chr1";
         // Populate the header with SAMSequenceRecords
-//        header.getSequenceDictionary().addSequence(new SAMSequenceRecord(sequence, 1000000));
         header.setSequenceDictionary(SamReaderFactory.makeDefault().getFileHeader(sequenceDict2).getSequenceDictionary());
 
         final SAMFileWriter alignedWriter = factory.makeSAMWriter(header, false, alignedSam);
@@ -1304,19 +1302,19 @@ public class MergeBamAlignmentTest extends CommandLineProgramTest {
                 "IS_BISULFITE_SEQUENCE=" + isBisulfiteSequence,
                 "MAX_INSERTIONS_OR_DELETIONS=" + maxInsOrDels));
         if (alignedBams != null) {
-            args.addAll(alignedBams.stream()
-                    .map(alignedBam -> "ALIGNED_BAM=" + alignedBam.getAbsolutePath())
-                    .collect(Collectors.toList()));
+            for (final File alignedBam : alignedBams) {
+                args.add("ALIGNED_BAM=" + alignedBam.getAbsolutePath());
+            }
         }
         if (read1AlignedBams != null) {
-            args.addAll(read1AlignedBams.stream()
-                    .map(alignedBam -> "READ1_ALIGNED_BAM=" + alignedBam.getAbsolutePath())
-                    .collect(Collectors.toList()));
+            for (final File alignedBam : read1AlignedBams) {
+                args.add("READ1_ALIGNED_BAM=" + alignedBam.getAbsolutePath());
+            }
         }
         if (read2AlignedBams != null) {
-            args.addAll(read2AlignedBams.stream()
-                    .map(alignedBam -> "READ2_ALIGNED_BAM=" + alignedBam.getAbsolutePath())
-                    .collect(Collectors.toList()));
+            for (final File alignedBam : read2AlignedBams) {
+                args.add("READ2_ALIGNED_BAM=" + alignedBam.getAbsolutePath());
+            }
         }
         if (read1Trim != null) {
             args.add("READ1_TRIM=" + read1Trim);
