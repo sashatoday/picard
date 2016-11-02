@@ -39,6 +39,7 @@ import picard.cmdline.programgroups.SamOrBam;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -209,12 +210,7 @@ public class MergeBamAlignment extends CommandLineProgram {
     public int MIN_UNCLIPPED_BASES = 32;
 
     @Option(doc = "List of Sequence Records tags that must be equal (if present) in the reference dictionary and in the aligned file. Mismatching tags will cause an error if in this list, and a warning otherwise.")
-    public List<String> MATCHING_DICTIONARY_TAGS = DEFAULT_EQUAL_DICT_TAGS;
-
-    // package-protected for testing
-    static final List<String> DEFAULT_EQUAL_DICT_TAGS = Arrays.asList(SAMSequenceRecord.MD5_TAG, SAMSequenceRecord.SEQUENCE_LENGTH_TAG);
-
-    private static final Log log = Log.getInstance(MergeBamAlignment.class);
+    public List<String> MATCHING_DICTIONARY_TAGS = SAMSequenceDictionary.DEFAULT_DICTIONARY_EQUAL_TAG;
 
     /**
      * Mechanism to bridge between command line option and PrimaryAlignmentSelectionStrategy implementation.
@@ -257,9 +253,9 @@ public class MergeBamAlignment extends CommandLineProgram {
         }
         // TEMPORARY FIX until internal programs all specify EXPECTED_ORIENTATIONS
         if (JUMP_SIZE != null) {
-            EXPECTED_ORIENTATIONS = Arrays.asList(SamPairUtil.PairOrientation.RF);
+            EXPECTED_ORIENTATIONS = Collections.singletonList(SamPairUtil.PairOrientation.RF);
         } else if (EXPECTED_ORIENTATIONS == null || EXPECTED_ORIENTATIONS.isEmpty()) {
-            EXPECTED_ORIENTATIONS = Arrays.asList(SamPairUtil.PairOrientation.FR);
+            EXPECTED_ORIENTATIONS = Collections.singletonList(SamPairUtil.PairOrientation.FR);
         }
 
         final SamAlignmentMerger merger = new SamAlignmentMerger(UNMAPPED_BAM, OUTPUT,
@@ -309,10 +305,8 @@ public class MergeBamAlignment extends CommandLineProgram {
         if (ALIGNED_BAM == null || ALIGNED_BAM.isEmpty() && !(r1sExist && r2sExist)) {
             return new String[]{"Either ALIGNED_BAM or the combination of " +
                     "READ1_ALIGNED_BAM and READ2_ALIGNED_BAM must be supplied."};
-
         }
 
         return null;
     }
-
 }
