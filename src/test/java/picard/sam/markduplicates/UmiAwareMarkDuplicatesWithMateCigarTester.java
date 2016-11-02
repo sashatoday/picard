@@ -28,9 +28,9 @@ import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.metrics.MetricsFile;
-import htsjdk.samtools.util.TestUtil;
 import org.testng.Assert;
 import picard.cmdline.CommandLineProgram;
+import picard.sam.DuplicationMetrics;
 import picard.sam.UmiMetrics;
 
 import java.io.File;
@@ -51,6 +51,8 @@ public class UmiAwareMarkDuplicatesWithMateCigarTester extends AbstractMarkDupli
 
     // This tag is only used for testing, it indicates what we expect to see in the inferred UMI tag.
     private final String expectedUmiTag = "RE";
+    private final File umiMetricsFile = new File(getOutputDir(), "umimetrics.txt");
+    private final UmiMetrics expectedUmiMetrics = null;
 
     // This default constructor is intended to be used by tests inherited from
     // AbstractMarkDuplicatesCommandLineProgramTester.  Since those tests use
@@ -60,6 +62,8 @@ public class UmiAwareMarkDuplicatesWithMateCigarTester extends AbstractMarkDupli
     }
 
     UmiAwareMarkDuplicatesWithMateCigarTester(final boolean allowMissingUmis) {
+        addArg("UMI_METRICS=" + umiMetricsFile);
+
         if (allowMissingUmis) {
             addArg("ALLOW_MISSING_UMIS=" + true);
         }
@@ -161,6 +165,20 @@ public class UmiAwareMarkDuplicatesWithMateCigarTester extends AbstractMarkDupli
                 Assert.assertEquals(record.getAttribute("MI"), record.getAttribute(expectedUmiTag));
             }
         }
+
+        // Check the values written to metrics.txt against our input expectations
+        final MetricsFile<UmiMetrics, Comparable<?>> umiMetricsOutput = new MetricsFile<UmiMetrics, Comparable<?>>();
+        try{
+            umiMetricsOutput.read(new FileReader(umiMetricsFile));
+        }
+        catch (final FileNotFoundException ex) {
+            System.err.println("Metrics file not found: " + ex);
+        }
+        Assert.assertEquals(umiMetricsOutput.getMetrics().size(), 1);
+        final UmiMetrics observedMetrics = umiMetricsOutput.getMetrics().get(0);
+        Assert.assertEquals(observedMetrics.UMI_LENGTH, expectedUmiMetrics.UMI_LENGTH, "UNPAIRED_READS_EXAMINED does not match expected");
+        
+
         // Also do tests from AbstractMarkDuplicatesCommandLineProgramTester
         super.test();
     }

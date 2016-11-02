@@ -215,4 +215,8 @@ public class UmiGraph {
         }
         return duplicateSetsFromUmis;
     }
+
+    public int getnumUmi() {
+        return numUmis;
+    }
 }

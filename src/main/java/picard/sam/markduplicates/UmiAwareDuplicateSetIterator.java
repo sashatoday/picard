@@ -34,6 +34,7 @@
 
 package picard.sam.markduplicates;
 
+import com.google.common.math.LongMath;
 import htsjdk.samtools.DuplicateSet;
 import htsjdk.samtools.DuplicateSetIterator;
 import htsjdk.samtools.SAMRecord;
@@ -62,10 +63,10 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
     private boolean haveWeSeenFirstRead = false;
     private long duplicateSetsWithUmi = 0;
     private long duplicateSetsWithoutUmi = 0;
+    private double expectedCollisions = 0;
 
     private Histogram<String> observedUmis = new Histogram<>();
     private Histogram<String> inferredUmis = new Histogram<>();
-    private Histogram<String> umiObservationByDuplicateSet = new Histogram<>();
 
     /**
      * Creates a UMI aware duplicate set iterator
@@ -104,7 +105,19 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
 
         metrics.DUPLICATE_SETS_WITH_UMI = duplicateSetsWithUmi;
         metrics.DUPLICATE_SETS_WITHOUT_UMI = duplicateSetsWithoutUmi;
+        metrics.EXPECTED_UMI_COLLISIONS = expectedCollisions;
 
+        metrics.UMI_COLLISION_RATE = - 10 * Math.log10(expectedCollisions / observedUmis.size());
+
+        double Z = 0;
+        for(int k = 0;k <= maxEditDistanceToJoin;k++) {
+            Z = Z + LongMath.binomial(metrics.UMI_LENGTH, k) * Math.pow(3.0, k);
+        }
+
+        metrics.UMI_AVOIDANCE = - 10 * Math.log10((1 -
+                Math.pow(1 - Z / Math.pow(4, metrics.UMI_LENGTH), metrics.OBSERVED_UNIQUE_UMIS-1)));
+
+        metrics.GINI_COEFFICIENT = gini(observedUmis);
         metrics.computeMetrics();
 
     }
@@ -172,15 +185,19 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
                 }
             }
 
-            // Increment the number of times we have seen a particular barcode
-            // in a duplicate set.
-            if(inferredUmi != null) {
-                umiObservationByDuplicateSet.increment(inferredUmi);
-            }
-
             duplicateSetsWithUmi++;
         }
         duplicateSetsWithoutUmi++;
+
+        // For each duplicate set estimate the number of expected umi collisions
+        double Z = 0;
+        for(int k = 0;k <= maxEditDistanceToJoin;k++) {
+            Z = Z + LongMath.binomial(metrics.UMI_LENGTH, k) * Math.pow(3.0, k);
+        }
+
+        expectedCollisions = expectedCollisions +
+                (1 -  Math.pow(1 - Z / Math.pow(4, metrics.UMI_LENGTH), umiGraph.getnumUmi()-1)) * umiGraph.getnumUmi();
+
 
         nextSetsIterator = duplicateSets.iterator();
     }
@@ -214,5 +231,35 @@ class UmiAwareDuplicateSetIterator implements CloseableIterator<DuplicateSet> {
             }
         }
         return measuredDistance;
+    }
+
+    private double gini(Histogram<String> hist) {
+        double G = 0.0;
+
+        double[] darray = new double[hist.size()];
+        int k = 0;
+        for(String entry : hist.keySet()) {
+            darray[k] = hist.get(entry).getValue();
+            k++;
+        }
+        Arrays.sort(darray);
+
+        double[] cumsum = new double[hist.size()];
+        cumsum[0] = darray[0];
+        for(k = 1;k < hist.size();k++) {
+            cumsum[k] = cumsum[k-1] + darray[k];
+        }
+
+        for(k = 0;k < hist.size();k++) {
+            cumsum[k] = cumsum[k] / cumsum[hist.size()-1];
+        }
+
+        double B = 0;
+        for(k = 0;k < hist.size();k++) {
+            B = B + cumsum[k]/hist.size();
+        }
+        G = (0.5 - B) / 0.5;
+
+        return G;
     }
 }

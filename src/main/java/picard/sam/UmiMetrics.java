@@ -63,7 +63,14 @@ public class UmiMetrics extends MetricBase {
     public double ESTIMATED_BASE_QUALITY_OF_UMIS;
 
     // Phred scaled quality of UMI avoidance
+    // -log((1 - (1 - choose(L, d)*3^d / 4^L)^(n-1))) / log(10) * 10
     public double UMI_AVOIDANCE;
+
+    public double EXPECTED_UMI_COLLISIONS;
+
+    public double UMI_COLLISION_RATE;
+
+    public double GINI_COEFFICIENT;
 
     public void computeMetrics() {
         ESTIMATED_BASE_QUALITY_OF_UMIS = -10.0*Math.log10((double) OBSERVED_BASE_ERRORS / (double) TOTAL_UMI_BASES_OBSERVED);
