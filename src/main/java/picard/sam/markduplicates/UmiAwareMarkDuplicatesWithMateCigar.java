@@ -51,8 +51,7 @@ import picard.cmdline.programgroups.Alpha;
         programGroup = Alpha.class
 )
 public class UmiAwareMarkDuplicatesWithMateCigar extends SimpleMarkDuplicatesWithMateCigar {
-    static final String USAGE_SUMMARY = "Identifies duplicate reads using information from read positions and UMIs." +
-            "All records are then written to the output file with the duplicate records flagged.";
+    static final String USAGE_SUMMARY = "Identifies duplicate reads using information from read positions and UMIs.";
     static final String USAGE_DETAILS = "<p>UmiAwareMarkDuplicatesWithMateCigar locates and tags duplicate reads in a BAM or SAM file, where duplicate reads are " +
             "defined as originating from a single fragment of DNA. </p>" +
             "<p>This tool identifies a duplicate set by assuming that all members of a duplicate set must have the same start and end position," +
