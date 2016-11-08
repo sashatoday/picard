@@ -32,6 +32,7 @@ import picard.PicardException;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -529,12 +530,20 @@ public abstract class AbstractAlignmentMerger {
             // NB: for reads that look like contamination, just set unmapped flag and zero MQ but keep other flags as-is.
             // this maintains the sort order so that downstream analyses can use them for calculating evidence
             // of contamination vs other causes (e.g. structural variants)
+            unaligned.setAttribute("OA", encodeAlignment(aligned));
             unaligned.setReadUnmappedFlag(true);
             unaligned.setMappingQuality(SAMRecord.NO_MAPPING_QUALITY);
             unaligned.setAttribute(SAMTag.FT.name(), "Cross-species contamination");
         }
     }
 
+    private static String encodeAlignment(final SAMRecord rec) {
+        return String.join(",", rec.getReferenceName(),
+                Integer.toString(rec.getAlignmentStart()),
+                rec.getReadNegativeStrandFlag() ? "-" : "+",
+                rec.getCigarString(),
+                Integer.toString(rec.getMappingQuality()));
+    }
     /**
      * Copies alignment info from aligned to unaligned read, if there is an alignment, and sets mate information.
      *
