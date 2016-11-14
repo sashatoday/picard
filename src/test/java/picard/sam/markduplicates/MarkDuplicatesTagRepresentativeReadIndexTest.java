@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright (c) 2014 The Broad Institute
+ * Copyright (c) 2016 The Broad Institute
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -29,16 +29,16 @@ import org.testng.annotations.Test;
 /**
  * This class defines the individual test cases to run. The actual running of the test is done
  * by MarkDuplicatesWithMateCigarTester (see getTester).
- * @author nhomer@broadinstitute.org
+ * @author hogstrom@broadinstitute.org
  */
 public class MarkDuplicatesTagRepresentativeReadIndexTest extends AbstractMarkDuplicatesCommandLineProgramTest {
-    protected MarkDuplicatesTagRepresentativeeadIndexTester getTester() {
-        return new MarkDuplicatesTagRepresentativeeadIndexTester();
+    protected MarkDuplicatesTagRepresentativeReadIndexTester getTester() {
+        return new MarkDuplicatesTagRepresentativeReadIndexTester();
     }
 
     @Test
     public void testRepresentativeReadTag() {
-        final MarkDuplicatesTagRepresentativeeadIndexTester tester = getTester();
+        final MarkDuplicatesTagRepresentativeReadIndexTester tester = getTester();
         tester.testRepresentativeReads = true;
         tester.setExpectedOpticalDuplicate(1);
         String representativeReadName = "RUNID:1:1:16020:13352";
@@ -56,7 +56,7 @@ public class MarkDuplicatesTagRepresentativeReadIndexTest extends AbstractMarkDu
 
     @Test
     public void testMultiRepresentativeReadTags() {
-        final MarkDuplicatesTagRepresentativeeadIndexTester tester = getTester();
+        final MarkDuplicatesTagRepresentativeReadIndexTester tester = getTester();
         tester.testRepresentativeReads = true;
         tester.setExpectedOpticalDuplicate(3);
         // Duplicate set: size 2 - all optical

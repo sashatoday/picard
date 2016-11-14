@@ -1,7 +1,7 @@
 /*
  * The MIT License
  *
- * Copyright (c) 2014 The Broad Institute
+ * Copyright (c) 2016 The Broad Institute
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -33,6 +33,7 @@ import htsjdk.samtools.metrics.MetricsFile;
 import htsjdk.samtools.util.CloserUtil;
 import htsjdk.samtools.util.TestUtil;
 import org.testng.Assert;
+import picard.PicardException;
 import picard.cmdline.CommandLineProgram;
 import picard.sam.DuplicationMetrics;
 
@@ -44,15 +45,16 @@ import java.util.Map;
 /**
  * This class is an extension of AbstractMarkDuplicatesCommandLineProgramTester used to test MarkDuplicatesWithMateCigar with SAM files generated on the fly.
  * This performs the underlying tests defined by classes such as see AbstractMarkDuplicatesCommandLineProgramTest and MarkDuplicatesWithMateCigarTest.
+ * @author hogstrom@broadinstitute.org
  */
-public class MarkDuplicatesTagRepresentativeeadIndexTester extends AbstractMarkDuplicatesCommandLineProgramTester {
+public class MarkDuplicatesTagRepresentativeReadIndexTester extends AbstractMarkDuplicatesCommandLineProgramTester {
 
     //final public Map<String, String> readToRepReadMap = new HashMap<>(); // map to contain representative read names for each record
     final public Map<Integer, Integer> expectedRepresentativeIndexMap = new HashMap<>();
     final public Map<String, Integer> expectedSetSizeMap = new HashMap<>();
     public boolean testRepresentativeReads = false;
 
-    public MarkDuplicatesTagRepresentativeeadIndexTester() {
+    public MarkDuplicatesTagRepresentativeReadIndexTester() {
 
         addArg("TAGGING_POLICY=All");
         addArg("TAG_DUPLICATE_SET_MEMBERS=true");
@@ -103,7 +105,7 @@ public class MarkDuplicatesTagRepresentativeeadIndexTester extends AbstractMarkD
                 metricsOutput.read(new FileReader(metricsFile));
             }
             catch (final FileNotFoundException ex) {
-                System.err.println("Metrics file not found: " + ex);
+                throw new PicardException("Metrics file not found: " + ex);
             }
             Assert.assertEquals(metricsOutput.getMetrics().size(), 1);
             final DuplicationMetrics observedMetrics = metricsOutput.getMetrics().get(0);
