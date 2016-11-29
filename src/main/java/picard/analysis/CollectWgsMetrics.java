@@ -47,10 +47,15 @@ import picard.util.MathUtil;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import java.util.stream.LongStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import static picard.cmdline.StandardOptionDefinitions.MINIMUM_MAPPING_QUALITY_SHORT_NAME;
 
@@ -129,6 +134,8 @@ static final String USAGE_DETAILS = "<p>This tool collects metrics about the fra
 
     private final Log log = Log.getInstance(CollectWgsMetrics.class);
     private static final double LOG_ODDS_THRESHOLD = 3.0;
+
+    public static final int READS_IN_PACK = 1000;
 
     /** Metrics for evaluating the performance of whole genome sequencing experiments. */
     public static class WgsMetrics extends MergeableMetricBase {
@@ -463,6 +470,9 @@ static final String USAGE_DETAILS = "<p>This tool collects metrics about the fra
         final long stopAfter = STOP_AFTER - 1;
         long counter = 0;
 
+        List<SamLocusIterator.LocusInfo> records = new ArrayList<>(READS_IN_PACK);
+        ExecutorService service = Executors.newCachedThreadPool();
+
         // Loop through all the loci
         while (iterator.hasNext()) {
             final SamLocusIterator.LocusInfo info = iterator.next();
@@ -472,19 +482,54 @@ static final String USAGE_DETAILS = "<p>This tool collects metrics about the fra
             final byte base = ref.getBases()[info.getPosition() - 1];
             if (SequenceUtil.isNoCall(base)) continue;
 
-            // add to the collector
-            collector.addInfo(info);
+            records.add(info);
+            ++counter;
 
-            // check that we added the same number of bases to the raw coverage histogram and the base quality histograms
-            if (Arrays.stream(collector.unfilteredBaseQHistogramArray).sum() !=  LongStream.rangeClosed(0, collector.coverageCap).map(i -> (i * collector.unfilteredDepthHistogramArray[(int)i])).sum()) {
-                throw new PicardException("updated coverage and baseQ distributions unequally");
+            // Record progress
+            progress.record(info.getSequenceName(), info.getPosition());
+
+            if (records.size() < READS_IN_PACK && iterator.hasNext())
+            {
+                continue;
             }
 
-            // Record progress and perhaps stop
-            progress.record(info.getSequenceName(), info.getPosition());
-            if (usingStopAfter && ++counter > stopAfter) break;
+            final List<SamLocusIterator.LocusInfo> tmpRecords = records;
+            records = new ArrayList<>(READS_IN_PACK);
+
+            // Add read pack to the collector in a separate stream
+            service.submit(new Runnable() {
+                @Override
+                public void run() {
+                    for (SamLocusIterator.LocusInfo rec : tmpRecords) {
+                        collector.addInfo(rec);
+                    }
+                }
+            });
+
+            // Perhaps stop
+            if (usingStopAfter && counter > stopAfter) break;
         }
 
+        service.shutdown();
+
+        try {
+            service.awaitTermination(1, TimeUnit.DAYS);
+
+        } catch (InterruptedException ex) {
+            Logger.getLogger(SinglePassSamProgram.class.getName()).log(Level.SEVERE, null, ex);
+        }
+
+        long unfilteredBaseQHistogramSum = 0;
+        long unfilteredDepthHistogramSum = 0;
+        for (int i = 0; i < collector.unfilteredBaseQHistogramArray.length(); ++i) {
+            unfilteredBaseQHistogramSum += collector.unfilteredBaseQHistogramArray.get(i);
+        }
+        for (int i = 0; i <= collector.coverageCap; ++i) {
+            unfilteredDepthHistogramSum += i*collector.unfilteredDepthHistogramArray.get(i);
+        }
+        if (unfilteredBaseQHistogramSum != unfilteredDepthHistogramSum) {
+            throw new PicardException("updated coverage and baseQ distributions unequally");
+        }
 
         final MetricsFile<WgsMetrics, Integer> out = getMetricsFile();
         collector.addToMetricsFile(out, INCLUDE_BQ_HISTOGRAM, dupeFilter, mapqFilter, pairFilter);
@@ -552,21 +597,21 @@ static final String USAGE_DETAILS = "<p>This tool collects metrics about the fra
                                           final long basesExcludedByMapq,
                                           final long basesExcludedByDupes,
                                           final long basesExcludedByPairing,
-                                          final long basesExcludedByBaseq,
-                                          final long basesExcludedByOverlap,
-                                          final long basesExcludedByCapping,
+                                          final AtomicLong basesExcludedByBaseq,
+                                          final AtomicLong basesExcludedByOverlap,
+                                          final AtomicLong basesExcludedByCapping,
                                           final int coverageCap,
                                           final Histogram<Integer> unfilteredBaseQHistogram,
                                           final int theoreticalHetSensitivitySampleSize) {
         final double total = highQualityDepthHistogram.getSum();
-        final double totalWithExcludes = total + basesExcludedByDupes + basesExcludedByMapq + basesExcludedByPairing + basesExcludedByBaseq + basesExcludedByOverlap + basesExcludedByCapping;
+        final double totalWithExcludes = total + basesExcludedByDupes + basesExcludedByMapq + basesExcludedByPairing + basesExcludedByBaseq.get() + basesExcludedByOverlap.get() + basesExcludedByCapping.get();
 
         final double pctExcludedByMapq    = totalWithExcludes == 0 ? 0 : basesExcludedByMapq         / totalWithExcludes;
         final double pctExcludedByDupes   = totalWithExcludes == 0 ? 0 : basesExcludedByDupes        / totalWithExcludes;
         final double pctExcludedByPairing = totalWithExcludes == 0 ? 0 : basesExcludedByPairing      / totalWithExcludes;
-        final double pctExcludedByBaseq   = totalWithExcludes == 0 ? 0 : basesExcludedByBaseq        / totalWithExcludes;
-        final double pctExcludedByOverlap = totalWithExcludes == 0 ? 0 : basesExcludedByOverlap      / totalWithExcludes;
-        final double pctExcludedByCapping = totalWithExcludes == 0 ? 0 : basesExcludedByCapping      / totalWithExcludes;
+        final double pctExcludedByBaseq   = totalWithExcludes == 0 ? 0 : basesExcludedByBaseq.get()        / totalWithExcludes;
+        final double pctExcludedByOverlap = totalWithExcludes == 0 ? 0 : basesExcludedByOverlap.get()      / totalWithExcludes;
+        final double pctExcludedByCapping = totalWithExcludes == 0 ? 0 : basesExcludedByCapping.get()      / totalWithExcludes;
         final double pctTotal             = totalWithExcludes == 0 ? 0 : (totalWithExcludes - total) / totalWithExcludes;
 
         return generateWgsMetrics(
@@ -612,25 +657,25 @@ static final String USAGE_DETAILS = "<p>This tool collects metrics about the fra
 
         // Count of sites with a given depth of coverage. Includes all but quality 2 bases.
         // We draw depths from this histogram when we calculate the theoretical het sensitivity.
-        protected final long[] unfilteredDepthHistogramArray;
+        protected final AtomicLongArray unfilteredDepthHistogramArray;
 
         // Count of bases observed with a given base quality. Includes all but quality 2 bases.
         // We draw bases from this histogram when we calculate the theoretical het sensitivity.
-        protected final long[] unfilteredBaseQHistogramArray;
+        protected final AtomicLongArray unfilteredBaseQHistogramArray;
 
         // Count of sites with a given depth of coverage. Excludes bases with quality below MINIMUM_BASE_QUALITY (default 20).
-        protected final long[] highQualityDepthHistogramArray;
+        protected final AtomicLongArray highQualityDepthHistogramArray;
 
-        private long basesExcludedByBaseq = 0;
-        private long basesExcludedByOverlap = 0;
-        private long basesExcludedByCapping = 0;
+        private AtomicLong basesExcludedByBaseq = new AtomicLong();
+        private AtomicLong basesExcludedByOverlap = new AtomicLong();
+        private AtomicLong basesExcludedByCapping = new AtomicLong();
         protected final IntervalList intervals;
         protected final int coverageCap;
 
         public WgsMetricsCollector(final int coverageCap, final IntervalList intervals) {
-            unfilteredDepthHistogramArray = new long[coverageCap + 1];
-            highQualityDepthHistogramArray = new long[coverageCap + 1];
-            unfilteredBaseQHistogramArray = new long[Byte.MAX_VALUE];
+            unfilteredDepthHistogramArray = new AtomicLongArray(coverageCap + 1);
+            highQualityDepthHistogramArray = new AtomicLongArray(coverageCap + 1);
+            unfilteredBaseQHistogramArray = new AtomicLongArray(coverageCap + 1);
             this.coverageCap    = coverageCap;
             this.intervals      = intervals;
         }
@@ -643,26 +688,26 @@ static final String USAGE_DETAILS = "<p>This tool collects metrics about the fra
             int unfilteredDepth = 0;
 
             for (final SamLocusIterator.RecordAndOffset recs : info.getRecordAndPositions()) {
-                if (recs.getBaseQuality() <= 2) { ++basesExcludedByBaseq;   continue; }
+                if (recs.getBaseQuality() <= 2) { basesExcludedByBaseq.incrementAndGet();;   continue; }
 
                 // we add to the base quality histogram any bases that have quality > 2
                 // the raw depth may exceed the coverageCap before the high-quality depth does. So stop counting once we reach the coverage cap.
                 if (unfilteredDepth < coverageCap) {
-                    unfilteredBaseQHistogramArray[recs.getRecord().getBaseQualities()[recs.getOffset()]]++;
+                    unfilteredBaseQHistogramArray.getAndIncrement(recs.getRecord().getBaseQualities()[recs.getOffset()]);
                     unfilteredDepth++;
                 }
 
                 if (recs.getBaseQuality() < MINIMUM_BASE_QUALITY ||
-                        SequenceUtil.isNoCall(recs.getReadBase()))                  { ++basesExcludedByBaseq;   continue; }
-                if (!readNames.add(recs.getRecord().getReadName()))                 { ++basesExcludedByOverlap; continue; }
+                        SequenceUtil.isNoCall(recs.getReadBase()))                  { basesExcludedByBaseq.incrementAndGet();;   continue; }
+                if (!readNames.add(recs.getRecord().getReadName()))                 { basesExcludedByOverlap.incrementAndGet();; continue; }
 
                 pileupSize++;
             }
 
             final int highQualityDepth = Math.min(pileupSize, coverageCap);
-            if (highQualityDepth < pileupSize) basesExcludedByCapping += pileupSize - coverageCap;
-            highQualityDepthHistogramArray[highQualityDepth]++;
-            unfilteredDepthHistogramArray[unfilteredDepth]++;
+            if (highQualityDepth < pileupSize) basesExcludedByCapping.addAndGet(pileupSize - coverageCap);
+            highQualityDepthHistogramArray.getAndIncrement(highQualityDepth);
+            unfilteredDepthHistogramArray.getAndIncrement(unfilteredDepth);
         }
 
         public void addToMetricsFile(final MetricsFile<WgsMetrics, Integer> file,
@@ -696,10 +741,10 @@ static final String USAGE_DETAILS = "<p>This tool collects metrics about the fra
             return getHistogram(unfilteredBaseQHistogramArray, "baseq", "unfiltered_baseq_count");
         }
 
-        protected Histogram<Integer> getHistogram(final long[] array, final String binLabel, final String valueLabel) {
+        protected Histogram<Integer> getHistogram(final AtomicLongArray array, final String binLabel, final String valueLabel) {
             final Histogram<Integer> histogram = new Histogram<>(binLabel, valueLabel);
-            for (int i = 0; i < array.length; ++i) {
-                histogram.increment(i, array[i]);
+            for (int i = 0; i < array.length(); ++i) {
+                histogram.increment(i, array.get(i));
             }
             return histogram;
         }

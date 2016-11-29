@@ -206,8 +206,8 @@ public class CollectWgsMetricsWithNonZeroCoverage extends CollectWgsMetrics {
 
             // set count of the coverage-zero bin to 0 and re-calculate metrics
             // note we don't need to update the base quality histogram; there are no bases in the depth = 0 bin
-            highQualityDepthHistogramArray[0] = 0;
-            unfilteredDepthHistogramArray[0] = 0;
+            highQualityDepthHistogramArray.getAndSet(0, 0);
+            unfilteredDepthHistogramArray.getAndSet(0, 0);
 
             final WgsMetricsWithNonZeroCoverage metricsNonZero = (WgsMetricsWithNonZeroCoverage) getMetrics(dupeFilter, mapqFilter, pairFilter);
             metricsNonZero.CATEGORY = WgsMetricsWithNonZeroCoverage.Category.NON_ZERO_REGIONS;
@@ -229,8 +229,8 @@ public class CollectWgsMetricsWithNonZeroCoverage extends CollectWgsMetrics {
         private Histogram<Integer> getDepthHistogramNonZero() {
             final Histogram<Integer> depthHistogram = new Histogram<>("coverage", "count_NON_ZERO_REGIONS");
             // do not include the zero-coverage bin
-            for (int i = 1; i < highQualityDepthHistogramArray.length; ++i) {
-                depthHistogram.increment(i, highQualityDepthHistogramArray[i]);
+            for (int i = 1; i < highQualityDepthHistogramArray.length(); ++i) {
+                depthHistogram.increment(i, highQualityDepthHistogramArray.get(i));
             }
             return depthHistogram;
         }
